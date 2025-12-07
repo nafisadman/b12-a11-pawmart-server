@@ -95,7 +95,7 @@ async function run() {
       res.send(result);
     });
 
-
+    // adding orders from DB
     app.post("/orders", async (req, res) => {
       const data = req.body;
       console.log(data);
