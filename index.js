@@ -59,6 +59,15 @@ async function run() {
       const result = await petServices.findOne(query);
       res.send(result);
     });
+    
+    app.get("/recent-services", async (req, res) => {
+      const { id } = req.params;
+      console.log(id);
+
+      const query = { _id: new ObjectId(id) };
+      const result = await petServices.find(query).limit(6).toArray();
+      res.send(result);
+    });
 
     app.get("/auth/my-services", async (req, res) => {
       const { email } = req.query;
