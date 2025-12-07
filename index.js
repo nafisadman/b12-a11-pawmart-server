@@ -61,7 +61,7 @@ async function run() {
       res.send(result);
     });
     
-
+    // getting recent services data from DB while limiting
     app.get("/recent-services", async (req, res) => {
       const result = await petServices.find().sort({ _id: -1 }).limit(6).toArray();
       res.send(result);
