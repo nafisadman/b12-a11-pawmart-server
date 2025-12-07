@@ -61,11 +61,7 @@ async function run() {
     });
     
     app.get("/recent-services", async (req, res) => {
-      const { id } = req.params;
-      console.log(id);
-
-      const query = { _id: new ObjectId(id) };
-      const result = await petServices.find(query).limit(6).toArray();
+      const result = await petServices.find().sort({ _id: -1 }).limit(6).toArray();
       res.send(result);
     });
 
