@@ -51,6 +51,7 @@ async function run() {
       res.send(result);
     });
 
+    // get services from DB based on ID
     app.get("/services/:id", async (req, res) => {
       const { id } = req.params;
       console.log(id);
@@ -60,6 +61,7 @@ async function run() {
       res.send(result);
     });
     
+
     app.get("/recent-services", async (req, res) => {
       const result = await petServices.find().sort({ _id: -1 }).limit(6).toArray();
       res.send(result);
@@ -92,6 +94,7 @@ async function run() {
       const result = await petServices.deleteOne(query);
       res.send(result);
     });
+
 
     app.post("/orders", async (req, res) => {
       const data = req.body;
