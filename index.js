@@ -28,6 +28,19 @@ async function run() {
     const database = client.db("petService");
     const petServices = database.collection("services");
     const orderCollections = database.collection("orders");
+    const userCollections = database.collection("users");
+
+    // User Registration 
+    app.post("/users", async(req, res)=>{
+      const userInfo = req.body;
+      userInfo.createdAt = new Date();
+      userInfo.role = 'user';
+      userInfo.status = 'active';
+
+      const result = await userCollections.insertOne(userInfo);
+      console.log(result);
+      res.send(result);
+    })
 
     // post or save service to DB
     app.post("/services", async (req, res) => {
