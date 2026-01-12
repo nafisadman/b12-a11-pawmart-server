@@ -336,6 +336,80 @@ async function run() {
       res.send(result);
     });
 
+    // 1. GET ALL USERS (For Admin "All Users" page)
+    app.get("/users", async (req, res) => {
+      const result = await userCollections.find().toArray();
+      res.send(result);
+    });
+
+    // 2. MAKE ADMIN (To promote a user)
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollections.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // 3. ADMIN STATS (For Dashboard Widgets)
+    app.get("/admin-stats", async (req, res) => {
+      const users = await userCollections.estimatedDocumentCount();
+      const products = await petServices.estimatedDocumentCount();
+      const orders = await orderCollections.estimatedDocumentCount();
+
+      const allOrders = await orderCollections.find().toArray();
+      const revenue = allOrders.reduce(
+        (total, order) => total + (parseFloat(order.price) || 0),
+        0
+      );
+
+      res.send({
+        users,
+        products,
+        orders,
+        revenue,
+      });
+    });
+
+    app.get("/admin/all-items", async (req, res) => {
+      const page = parseInt(req.query.page) || 0;
+      const size = parseInt(req.query.size) || 10;
+
+      const result = await petServices
+        .find({})
+        .limit(size)
+        .skip(page * size)
+        .toArray();
+
+      const totalRequest = await petServices.estimatedDocumentCount();
+
+      res.send({ result, totalRequest });
+    });
+
+    // Delete a user
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollections.deleteOne(query);
+      res.send(result);
+    });
+
+    app.patch("/users/manager/:id", verifyFBToken, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "manager",
+        },
+      };
+      const result = await userCollections.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     console.log(
