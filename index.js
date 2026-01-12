@@ -31,7 +31,7 @@ const verifyFBToken = async (req, res, next) => {
   try {
     const idToken = token.split(" ")[1];
     const decoded = await admin.auth().verifyIdToken(idToken);
-    console.log("decoded info ", decoded);
+    // console.log("decoded info ", decoded);
     req.decoded_email = decoded.email;
     next();
   } catch (error) {
@@ -81,7 +81,7 @@ async function run() {
       res.status(200).send(result);
     });
 
-    // GET user information
+    // GET user information based on email
     app.get(`/users/:email`, async (req, res) => {
       const { email } = req.params;
       console.log(email);
@@ -103,7 +103,7 @@ async function run() {
       res.send(result);
     });
 
-    // get services from DB
+    // GET all services
     app.get("/services", async (req, res) => {
       const { category } = req.query;
       const query = {};
@@ -114,10 +114,52 @@ async function run() {
       res.send(result);
     });
 
-    // get services from DB based on ID
+    // GET all services based on user email
+    app.get("/services/:email", async (req, res) => {
+      const { email } = req.params;
+      
+      const page = Number(req.query.page);
+      const size = Number(req.query.size);
+      const status = req.query.status;
+
+      const query = { email: email };
+      const result = await petServices.find(query).toArray();
+      console.log(result);
+      res.send({ result: result });
+    });
+
+    // GET all services based on user params
+    app.get("/my-items", verifyFBToken, async (req, res) => {
+      const email = req.decoded_email;
+      const page = Number(req.query.page);
+      const size = Number(req.query.size);
+      const status = req.query.status;
+
+      console.log("Email", email);
+
+      const query = { email: email };
+
+      if (status) {
+        query.status = status;
+      }
+
+      const result = await petServices
+        .find(query)
+        .limit(size)
+        .skip(page * size)
+        .toArray();
+
+      console.log("/my-items", result);
+
+      const totalRequest = await petServices.countDocuments(query);
+
+      res.send({ result: result, totalRequest });
+    });
+
+    // GET one service based on service ID
     app.get("/services/:id", async (req, res) => {
       const { id } = req.params;
-      console.log(id);
+      // console.log(id);
 
       const query = { _id: new ObjectId(id) };
       const result = await petServices.findOne(query);
@@ -165,7 +207,7 @@ async function run() {
     // adding orders from DB
     app.post("/orders", async (req, res) => {
       const data = req.body;
-      console.log(data);
+      // console.log(data);
       const result = await orderCollections.insertOne(data);
       res.status(201).send(result);
     });
