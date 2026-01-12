@@ -93,10 +93,11 @@ async function run() {
     });
 
     // post or save service to DB
-    app.post("/services", verifyFBToken, async (req, res) => {
+    app.post("/services", async (req, res) => {
       const data = req.body;
       const date = new Date();
       data.createdAt = date;
+      data.itemStatus = "Not Sold";
 
       console.log(data);
       const result = await petServices.insertOne(data);
@@ -105,11 +106,17 @@ async function run() {
 
     // GET all services
     app.get("/services", async (req, res) => {
-      const { category } = req.query;
+      const { category, search } = req.query;
       const query = {};
-      if (category) {
+
+      if (category && category !== "Pick an item") {
         query.category = category;
       }
+
+      if (search) {
+        query.name = { $regex: search, $options: "i" };
+      }
+
       const result = await petServices.find(query).toArray();
       res.send(result);
     });
@@ -117,20 +124,32 @@ async function run() {
     // GET all services based on user email
     app.get("/services/:email", async (req, res) => {
       const { email } = req.params;
-      
-      const page = Number(req.query.page);
-      const size = Number(req.query.size);
+
+      const page = Number(req.query.page) || 0;
+      const size = Number(req.query.size) || 10;
       const status = req.query.status;
 
       const query = { email: email };
-      const result = await petServices.find(query).toArray();
-      console.log(result);
+
+      // Optional: Add status filter if your schema supports it
+      if (status) {
+        query.itemStatus = status;
+      }
+
+      const result = await petServices
+        .find(query)
+        .skip(page * size) // Fix: Apply pagination skip
+        .limit(size) // Fix: Apply pagination limit
+        .toArray();
+
+      // console.log(result);
       res.send({ result: result });
     });
 
     // GET all services based on user params
-    app.get("/my-items", verifyFBToken, async (req, res) => {
-      const email = req.decoded_email;
+    app.get("/my-items", async (req, res) => {
+      const email = req.query.email;
+
       const page = Number(req.query.page);
       const size = Number(req.query.size);
       const status = req.query.status;
@@ -157,9 +176,9 @@ async function run() {
     });
 
     // GET one service based on service ID
-    app.get("/services/:id", async (req, res) => {
+    app.get("/services/details/:id", async (req, res) => {
       const { id } = req.params;
-      // console.log(id);
+      console.log(id);
 
       const query = { _id: new ObjectId(id) };
       const result = await petServices.findOne(query);
@@ -215,6 +234,106 @@ async function run() {
     app.get("/orders", async (req, res) => {
       const result = await orderCollections.find().toArray();
       res.status(200).send(result);
+    });
+
+    // GET recent requests specifically for the dashboard widget
+    // Sorts by newest first, limits to 6 items, sends an Array directly
+    app.get("/recent-requests/:email", async (req, res) => {
+      const { email } = req.params;
+      const query = { email: email };
+
+      const result = await petServices
+        .find(query)
+        .sort({ _id: -1 }) // Sort by newest (descending)
+        .limit(3) // Limit to 3 items for the widget
+        .toArray();
+
+      res.send(result); // Sends [ ... ] instead of { result: ... }
+    });
+
+    // GET specific user's items with pagination and filtering
+    app.get("/users-items", async (req, res) => {
+      const email = req.query.email;
+      const page = parseInt(req.query.page) || 0;
+      const size = parseInt(req.query.size) || 10;
+      const status = req.query.status; // Frontend sends "available" or "sold"
+
+      // 1. Filter by Email (Top-level field based on your image)
+      const query = { email: email };
+
+      // 2. Filter by Status
+      // We need to match the frontend filter values to your DB values
+      // DB uses "Not Sold", but frontend might use "available"
+      if (status) {
+        // If user selects "available" in filter, we look for "Not Sold" in DB
+        // If user selects "sold", we look for "Sold"
+        // You can adjust this mapping based on exactly what strings you save
+        const statusArray = status.split(",").map((s) => {
+          if (s === "available") return "Not Sold";
+          if (s === "sold") return "Sold";
+          return s;
+        });
+
+        query.itemStatus = { $in: statusArray };
+      }
+
+      console.log("Querying /users-items with:", query);
+
+      const result = await petServices
+        .find(query)
+        .limit(size)
+        .skip(page * size)
+        .toArray();
+
+      const totalRequest = await petServices.countDocuments(query);
+
+      res.send({ result, totalRequest });
+    });
+
+    app.patch("/donation-request-status/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+
+      const query = { _id: new ObjectId(id) };
+
+      const updateDoc = {
+        $set: {
+          itemStatus: status,
+        },
+      };
+
+      const result = await petServices.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.delete("/requests/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await petServices.deleteOne(query);
+      res.send(result);
+    });
+
+    // PUT: Update an existing item
+    app.put("/update-item/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedItem = req.body;
+
+      const item = {
+        $set: {
+          name: updatedItem.name,
+          category: updatedItem.category,
+          location: updatedItem.location,
+          price: updatedItem.price,
+          pickupDate: updatedItem.pickupDate,
+          description: updatedItem.description,
+          // We usually don't update email or _id
+        },
+      };
+
+      const result = await petServices.updateOne(filter, item, options);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
